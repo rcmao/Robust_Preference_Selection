@@ -1,0 +1,15 @@
+outputs/
+data/
+*.log
+*.pdf
+*.zip
+__pycache__/
+*.ipynb_checkpoints/
+.cache/
+*.pyc
+.DS_Store
+.vscode/
+.idea/
+*.egg-info/
+dist/
+build/
