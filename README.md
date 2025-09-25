@@ -15,7 +15,7 @@ A complete implementation of the Robust Preference Selection (RPS) pipeline with
 
 ```
 rps_code/
-├── baseline/           # Baseline response generation
+├── baseline_generation/           # Baseline response generation
 │   ├── sft_baseline.py
 │   ├── dpo_baseline.py
 │   └── simpo_baseline.py
@@ -58,7 +58,7 @@ python pipelines/run_helpsteer_pipeline.py \
 
 #### Generate Baseline
 ```bash
-python baseline/sft_baseline.py \
+python baseline_generation/sft_baseline.py \
   --dataset nvidia/HelpSteer \
   --model mistralai/Mistral-7B-Instruct-v0.2 \
   --output_dir ./outputs/baseline \
