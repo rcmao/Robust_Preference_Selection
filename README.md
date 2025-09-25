@@ -1,62 +1,42 @@
 # Comprehensive RPS Pipeline
 
-A complete implementation of the Robust Preference Selection (RPS) pipeline with full functionality preserved from the original experiments.
+A complete implementation of the Robust Preference Selection (RPS) pipeline. The code and README reflect the current repository state.
 
 ## Pipeline Overview
 
 ```
 1. Baseline Generation    2. RPS Generation         3. Scoring & Selection    4. A/B Comparison
-   ├─ SFT baseline       ├─ Angle perturbation    ├─ Reward model scoring  ├─ Pairwise judging
-   ├─ DPO baseline       ├─ Multi-response gen    ├─ Best selection        ├─ Parallel GPT calls
-   └─ Multiple models    └─ vLLM acceleration     └─ Batch processing      └─ Win rate analysis
+   ├─ SFT baseline       ├─ Angle perturbation    ├─ Reward model scoring  ├─ Parallel GPT calls
+   └─ Multiple models    └─ Multi-response gen     └─ Best selection        └─ Summary statistics
 ```
 
 ## Directory Structure
 
 ```
 rps_code/
-├── baseline_generation/           # Baseline response generation
-│   ├── sft_baseline.py
-│   ├── dpo_baseline.py
-│   └── simpo_baseline.py
-├── rps/                # RPS perturbation generation  
-│   ├── angle_perturbation.py
-│   ├── rps_generation.py
-│   └── rps_vllm.py
-├── scoring/            # Reward model scoring
+├── baseline_generation/          # Baseline response generation
+│   └── sft_baseline.py
+├── rps/                          # RPS perturbation generation  
+│   └── rps_generation.py
+├── scoring/                      # Reward model scoring and best selection
 │   ├── reward_scoring.py
 │   └── best_selection.py
-├── comparison/         # A/B comparison
-│   ├── pairwise_judge.py
+├── comparison/                   # A/B comparison
 │   └── parallel_compare.py
-├── utils/              # Utilities
-│   ├── env_detection.py
-│   ├── model_loaders.py
-│   ├── data_utils.py
-│   └── directions.py
-├── configs/            # Configuration files
-│   ├── models.yaml
-│   └── datasets.yaml
-└── pipelines/          # Complete pipeline scripts
-    ├── run_helpsteer_pipeline.py
-    ├── run_ultra_pipeline.py
-    └── run_full_comparison.py
+└── utils/                        # Utilities
+    ├── env_detection.py
+    ├── model_loaders.py
+    ├── data_utils.py
+    └── directions.py
 ```
 
 ## Quick Start
 
-### 1. Complete HelpSteer Pipeline
-```bash
-python pipelines/run_helpsteer_pipeline.py \
-  --dataset nvidia/HelpSteer \
-  --model mistralai/Mistral-7B-Instruct-v0.2 \
-  --output_dir ./outputs \
-  --num_prompts 2000
-```
+Note on directions: the repository uses v1–v8 to denote preference directions.
 
 ### 2. Individual Steps
 
-#### Generate Baseline
+#### 1) Generate Baseline (SFT)
 ```bash
 python baseline_generation/sft_baseline.py \
   --dataset nvidia/HelpSteer \
@@ -66,30 +46,37 @@ python baseline_generation/sft_baseline.py \
   --num_responses 3
 ```
 
-#### Generate RPS Responses
+Outputs are written as `./outputs/baseline/baseline_responses_v{X}.csv`.
+
+#### 2) Generate RPS Responses (angle perturbations)
 ```bash
 python rps/rps_generation.py \
   --dataset nvidia/HelpSteer \
   --model mistralai/Mistral-7B-Instruct-v0.2 \
-  --output_dir ./outputs/rps \
+  --output_dir ./outputs \
   --angle_range -40,40 \
   --step 5 \
   --theta_max 30 \
   --top_k 5
 ```
 
-#### Score and Select Best
+Outputs are written per direction under `./outputs/rps/v{X}/rps_angle{angle}.csv`.
+
+#### 3) Score and Select Best
 ```bash
+## Example: score RPS outputs for direction v1, then select best
 python scoring/reward_scoring.py \
-  --input_dir ./outputs/baseline \
-  --output_dir ./outputs/baseline_scored
+  --input_dir ./outputs/rps/v1 \
+  --output_dir ./outputs/rps_scored/v1
 
 python scoring/best_selection.py \
-  --input_dir ./outputs/baseline_scored \
-  --output_dir ./outputs/baseline_best
+  --input_dir ./outputs/rps_scored/v1 \
+  --output_path ./outputs/rps_best/v1_best.csv
 ```
 
-#### Compare Baseline vs RPS
+Repeat scoring and selection for v1–v8 to produce `./outputs/rps_best/v{X}_best.csv`.
+
+#### 4) Compare Baseline vs RPS
 ```bash
 python comparison/parallel_compare.py \
   --baseline_dir ./outputs/baseline_best \
@@ -107,9 +94,9 @@ python comparison/parallel_compare.py \
 - **Local**: CPU fallback, local storage
 
 ### Model Support
-- **Generation**: Mistral-7B-Instruct-v0.2, Zephyr-7B-Beta, Gemma-2-9B-IT-SimPO
+- **Generation**: Mistral-7B-Instruct-v0.2 (others can be plugged in)
 - **Scoring**: RewardModel-Mistral-7B-for-DPA-v1 
-- **Judging**: GPT-4o-mini, GPT-4, OpenRouter models
+- **Judging**: GPT-4o-mini (via OpenAI/OpenRouter)
 
 ### Robustness Features
 - **Resume capability**: Automatic detection of existing outputs
@@ -119,8 +106,7 @@ python comparison/parallel_compare.py \
 
 ### Data Compatibility
 - **HelpSteer**: nvidia/HelpSteer (validation/train splits)
-- **UltraFeedback**: HuggingFaceH4/ultrafeedback_binarized
-- **Custom datasets**: With prompt/response columns
+- **Custom datasets**: With a `prompt` column
 
 ## Configuration
 
@@ -139,9 +125,10 @@ export HF_ENDPOINT="https://hf-mirror.com"
 ## Outputs
 
 All outputs are CSV/JSONL text files:
-- `responses_v{X}.csv`: Generated responses per direction
-- `v{X}_best.csv`: Best responses after scoring
-- `v{X}_judged.jsonl`: A/B comparison judgments  
-- `comparison_summary.csv`: Win rate statistics
+- Baseline: `baseline_responses_v{X}.csv`
+- RPS raw: `rps/v{X}/rps_angle{angle}.csv`
+- Best after scoring: `rps_best/v{X}_best.csv` (or `baseline_best/v{X}_best.csv` if you score baseline)
+- A/B judgments: `{v{X}}_judged.jsonl`
+- Summary: `comparison_summary.csv`
 
 No model weights or caches are included in outputs.
